@@ -2,6 +2,18 @@ package com.revature.bankofcli.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.revature.bankofcli.dto.transaction.ConductTransactionRequest;
+import com.revature.bankofcli.dto.transaction.DepositMoneyRequest;
+import com.revature.bankofcli.dto.transaction.RetrieveDepositResponse;
+import com.revature.bankofcli.dto.transaction.RetrieveTransactionHistoryResponse;
+import com.revature.bankofcli.dto.transaction.RetrieveTransactionResponse;
+import com.revature.bankofcli.dto.transaction.RetrieveTransferResponse;
+import com.revature.bankofcli.dto.transaction.RetrieveWithdrawalResponse;
+import com.revature.bankofcli.dto.transaction.SuccessfulDepositResponse;
+import com.revature.bankofcli.dto.transaction.SuccessfulTransferResponse;
+import com.revature.bankofcli.dto.transaction.SuccessfulWithdrawalResponse;
+import com.revature.bankofcli.dto.transaction.TransferMoneyRequest;
+import com.revature.bankofcli.dto.transaction.WithdrawMoneyRequest;
 
 import java.util.List;
 
@@ -10,6 +22,7 @@ import com.revature.bankofcli.domain.BankTransaction;
 import com.revature.bankofcli.domain.Deposit;
 import com.revature.bankofcli.domain.Transfer;
 import com.revature.bankofcli.domain.Withdrawal;
+
 import com.revature.bankofcli.repository.AccountRepository;
 import com.revature.bankofcli.repository.BankTransactionRepository;
 
@@ -17,160 +30,222 @@ import com.revature.bankofcli.exception.AccountNotFoundException;
 import com.revature.bankofcli.exception.AmountExceedsLimitException;
 import com.revature.bankofcli.exception.InsufficientFundsException;
 import com.revature.bankofcli.exception.InvalidAmountException;
+import com.revature.bankofcli.exception.RecipientNotFoundException;
 import com.revature.bankofcli.exception.SelfTransferException;
 
 @Service
 public class TransactionService {
-
-    /**
-     * Transaction uses the repository, no need fo "implements".
-     * 
-     * 
-     * Wouldn't call the BankTransaction because its an abstract class.
-     * Wouldn't call each type either.
-     * 
-     * What you need is to inject repositories.
-     * 
-     */
+    // Repositories
     private final BankTransactionRepository bankTransactionRepository;
     private final AccountRepository accountRepository;
 
-    public TransactionService(BankTransactionRepository bankTransactionRepository,
-            AccountRepository accountRepository) {
+    // Dependency injection for repositories
+    public TransactionService(
+        BankTransactionRepository bankTransactionRepository,
+        AccountRepository accountRepository
+    ) {
         this.bankTransactionRepository = bankTransactionRepository;
         this.accountRepository = accountRepository;
     }
 
-    // Deposit
     /**
-     * Need the @Transactional. A deposit is several database writes
-     * 1. Update the account's balance
-     * 2. Insert a row into bank_transaction
-     * 3. Insert a row into deposit
-     * 
-     * @Transactional groups them into one unit: either all of them happen
-     *                or none do. If step 3 fails, balance change from step 1 is
-     *                rolled back.
-     * 
-     *                Similar to part 1 of BANKOFCLI, its just Spring does it for
-     *                you now.
+     * Deposit
+     *
+     * @Transactional groups the balance update and the new bank_transaction row into one unit:
+     * either both happen or neither does.
      */
     @Transactional
-    public Deposit deposit(String accountEmail, long amountInCents, String memo) {
+    public SuccessfulDepositResponse deposit(Long accountId, DepositMoneyRequest request) {
+        Account account = transactionSetup(accountId, request);
 
-        // 1. Load account, or fail if it doesnt exist
-        Account account = accountRepository.findByEmail(accountEmail)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found."));
+        // Set new balance
+        account.setBalanceInCents(account.getBalanceInCents() + request.getAmountInCents());
 
-        // 2.Business rules
-        // error code 400
-        if (amountInCents <= 0) {
-            throw new InvalidAmountException();
-        }
-        // error code 400
-        if (amountInCents > 1_000_000) { // $10,000 in cents
-            throw new AmountExceedsLimitException("The deposit amount exceeds the maximum allowed limit of $10,000.");
-        }
-        // 3.Update Account's Balance
-        account.setBalanceInCents(account.getBalanceInCents() + amountInCents);
+        // Persist deposit record
+        Deposit deposit = bankTransactionRepository.save(new Deposit(
+            account,
+            request.getAmountInCents(),
+            null
+        ));
 
-        // 4.Create a transaction (Deposit)
-        Deposit deposit = new Deposit(account, amountInCents, memo);
-
-        // 5.Save and return
-        return bankTransactionRepository.save(deposit);
+        // Successful deposit response
+        return new SuccessfulDepositResponse(
+            deposit.getId(),
+            deposit.getAmountInCents(),
+            account.getBalanceInCents(),
+            deposit.getTimestamp(),
+            account.getEmail()
+        );
     }
 
     // Withdraw
     @Transactional
-    public Withdrawal withdraw(String accountEmail, long amountInCents, String memo) {
+    public SuccessfulWithdrawalResponse withdraw(Long accountId, WithdrawMoneyRequest request) {
+        Account account = transactionSetup(accountId, request);
 
-        // setup data
-        Account account = accountRepository.findByEmail(accountEmail)
-                .orElseThrow(() -> new AccountNotFoundException(
-                        "Account could not be found. No Withdrawals available at this time."));
-
-        // logic/business rules / check
-        // error code 400
-        if (amountInCents <= 0) {
-            throw new InvalidAmountException();
-        }
-        // error code 400
-        if (amountInCents > 1_000_000) {
-            throw new AmountExceedsLimitException(
-                    "The withdrawal amount exceeds the maximum allowed limit of $10,000.");
-        }
-        // Check if amount is greater than what you currently have.
-        // error code 400
-        if (amountInCents > account.getBalanceInCents()) {
-            throw new InsufficientFundsException(
-                    "Insufficient funds. The withdrawal amount exceeds your available balance.");
-
+        // Check if amount is greater than what you currently have
+        // Error code 400
+        if (request.getAmountInCents() > account.getBalanceInCents()) {
+            throw new InsufficientFundsException();
         }
 
         // Set new balance
-        account.setBalanceInCents(account.getBalanceInCents() - amountInCents);
+        account.setBalanceInCents(account.getBalanceInCents() - request.getAmountInCents());
 
-        // Create withdrawl
-        // Syntax: (Account account, OffsetDateTime timestamp, long amountInCents,
-        // String memo )
-        Withdrawal withdraw = new Withdrawal(account, amountInCents, memo);
+        // Persist withdrawal record
+        Withdrawal withdrawal = bankTransactionRepository.save(new Withdrawal(
+            account,
+            request.getAmountInCents(),
+            null
+        ));
 
-        // persist to transactions
-        return bankTransactionRepository.save(withdraw);
-
+        // Successful withdrawal response
+        return new SuccessfulWithdrawalResponse(
+            withdrawal.getId(),
+            withdrawal.getAmountInCents(),
+            account.getBalanceInCents(),
+            withdrawal.getTimestamp(),
+            account.getEmail()
+        );
     }
 
-    // Transfer Transfer(Account senderAccount, Account recipientAccount,
-    // OffsetDateTime timestamp, long amountInCents, String memo)
+    // Transfer
     @Transactional
-    public Transfer transfer(String accountSenderEmail, String accountRecipientEmail, long amountInCents, String memo) {
+    public SuccessfulTransferResponse transfer(Long accountId, TransferMoneyRequest request) {
+        validateAmount(request);
+        long amountInCents = request.getAmountInCents();
 
-        // Base Check
-        // error code 400
-        if (accountSenderEmail.equals(accountRecipientEmail)) {
+        // Find the recipient's id without loading the account, so it can be locked below
+        // Error code 404
+        Long recipientId = accountRepository.findIdByEmail(request.getRecipientAccountEmail())
+                .orElseThrow(RecipientNotFoundException::new);
+
+        // Error code 400
+        if (recipientId.equals(accountId)) {
             throw new SelfTransferException();
         }
 
-        // Gather accounts : from and to
-        Account accountSender = accountRepository.findByEmail(accountSenderEmail)
-                .orElseThrow(() -> new AccountNotFoundException("Could not find sender account."));
-        // Error Code 404
-        Account accountRecipient = accountRepository.findByEmail(accountRecipientEmail)
-                .orElseThrow(() -> new AccountNotFoundException("The recipient account could not be found."));
+        // Lock both accounts in a fixed order (lower id first) so two opposite transfers can't deadlock
+        Account first = lockAccount(Math.min(accountId, recipientId));
+        Account second = lockAccount(Math.max(accountId, recipientId));
+        Account sender = (first.getId() == accountId) ? first : second;
+        Account recipient = (sender == first) ? second : first;
 
-        // Business logic / checks
-
-        // Additional Checks
-        // error code 400
-        if (amountInCents <= 0) {
-            throw new InvalidAmountException();
+        // Check if amount is greater than what sender currently has
+        // Error code 400
+        if (amountInCents > sender.getBalanceInCents()) {
+            throw new InsufficientFundsException();
         }
-        // error code 400
-        if (amountInCents > 1_000_000) {
-            throw new AmountExceedsLimitException("The transfer amount exceeds the maximum allowed limit of $10,000.");
-        }
-        // error code 400
-        if (amountInCents > accountSender.getBalanceInCents()) {
-            throw new InsufficientFundsException(
-                    "Insufficient funds. The transfer amount exceeds your available balance.");
-        }
-        // Set new balance
-        accountSender.setBalanceInCents(accountSender.getBalanceInCents() - amountInCents);
-        accountRecipient.setBalanceInCents(accountRecipient.getBalanceInCents() + amountInCents);
 
-        // Create transfer
-        Transfer transfer = new Transfer(accountSender, accountRecipient, amountInCents, memo);
+        // Set new balances
+        sender.setBalanceInCents(sender.getBalanceInCents() - amountInCents);
+        recipient.setBalanceInCents(recipient.getBalanceInCents() + amountInCents);
 
-        // Persist to database
-        return bankTransactionRepository.save(transfer);
+        // Persist transfer record
+        Transfer transfer = bankTransactionRepository.save(new Transfer(sender, recipient, amountInCents, null));
 
+        // Successful transfer response
+        return new SuccessfulTransferResponse(
+            transfer.getId(),
+            transfer.getAmountInCents(),
+            sender.getBalanceInCents(),
+            transfer.getTimestamp(),
+            sender.getEmail(),
+            recipient.getEmail()
+        );
     }
 
     @Transactional(readOnly = true)
-    public List<BankTransaction> getTransactionHistory(Long accountId) {
-        // Should be allowed to be null
-        return bankTransactionRepository.findTransactionHistory(accountId);
+    public RetrieveTransactionHistoryResponse getTransactionHistory(Long accountId) {
+        // Get logged-in account
+        Account loggedInAccount = accountRepository.findById(accountId)
+            .orElseThrow(AccountNotFoundException::new);
+        
+        // Should be allowed to be empty
+        List<BankTransaction> pastBankTransactions = bankTransactionRepository.findTransactionHistory(accountId);
+
+        // Map to retrieval DTOs
+        return new RetrieveTransactionHistoryResponse(mapBankTransactionsToRetrievalDtos(pastBankTransactions, loggedInAccount));
     }
 
+    /*
+     * HELPER METHODS
+     */
+
+    // Loads and row-locks the account, then checks the rules shared by every transaction type
+    private Account transactionSetup(Long accountId, ConductTransactionRequest request) {
+        validateAmount(request);
+        return lockAccount(accountId);
+    }
+
+    // Rules shared by every transaction type
+    private void validateAmount(ConductTransactionRequest request) {
+        // Error code 400
+        if (request.getAmountInCents() <= 0) {
+            throw new InvalidAmountException();
+        }
+        // Error code 400
+        if (request.getAmountInCents() > 1_000_000) {
+            throw new AmountExceedsLimitException();
+        }
+    }
+
+    // Loads the account with a row lock (SELECT ... FOR UPDATE) that is held until the transaction ends
+    private Account lockAccount(Long accountId) {
+        return accountRepository.findByIdForUpdate(accountId)
+                .orElseThrow(AccountNotFoundException::new);
+    }
+
+    // Maps bank transaction list to bank transaction retrieval dto list
+    private List<RetrieveTransactionResponse> mapBankTransactionsToRetrievalDtos(List<BankTransaction> bankTransactions, Account loggedInAccount) {
+        return bankTransactions.stream()
+            // Map each bank transaction type to its corresponding retrieval DTO:
+            .map(bankTransaction -> {
+                // Deposit
+                if (bankTransaction instanceof Deposit deposit)
+                    { return mapDepositToRetrievalDto(deposit); }
+                // Withdrawal
+                else if (bankTransaction instanceof Withdrawal withdrawal)
+                    { return mapWithdrawalToRetrievalDto(withdrawal); }
+                // Transfer
+                else if (bankTransaction instanceof Transfer transfer)
+                    { return mapTransferToRetrievalDto(transfer, loggedInAccount); }
+                // Default (we should not reach this point)
+                else
+                    { throw new IllegalArgumentException("Unknown bank transaction type: " + bankTransaction.getClass().getName()); }
+            })
+            .toList();
+    }
+
+    // Maps deposit to deposit retrieval DTO
+    private RetrieveDepositResponse mapDepositToRetrievalDto(Deposit deposit) {
+        return new RetrieveDepositResponse(
+            deposit.getId(),
+            deposit.getAmountInCents(),
+            deposit.getTimestamp(),
+            deposit.getAccount().getEmail()
+        );
+    }
+
+    // Maps withdrawal to withdrawal retrieval DTO
+    private RetrieveWithdrawalResponse mapWithdrawalToRetrievalDto(Withdrawal withdrawal) {
+        return new RetrieveWithdrawalResponse(
+            withdrawal.getId(),
+            withdrawal.getAmountInCents(),
+            withdrawal.getTimestamp(),
+            withdrawal.getAccount().getEmail()
+        );
+    }
+
+    // Maps transfer to transfer retrieval DTO
+    private RetrieveTransferResponse mapTransferToRetrievalDto(Transfer transfer, Account loggedInAccount) {
+        return new RetrieveTransferResponse(
+            transfer.getId(),
+            transfer.getAmountInCents(),
+            transfer.getTimestamp(),
+            transfer.getSenderAccount().getEmail(),
+            transfer.getRecipientAccount().getEmail(),
+            loggedInAccount.getEmail()
+        );
+    }
 }

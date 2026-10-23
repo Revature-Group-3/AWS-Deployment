@@ -15,6 +15,9 @@ import com.revature.bankofcli.dto.transaction.SuccessfulWithdrawalResponse;
 import com.revature.bankofcli.dto.transaction.TransferMoneyRequest;
 import com.revature.bankofcli.dto.transaction.WithdrawMoneyRequest;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import com.revature.bankofcli.domain.Account;
@@ -73,7 +76,7 @@ public class TransactionService {
             deposit.getId(),
             deposit.getAmountInCents(),
             account.getBalanceInCents(),
-            deposit.getTimestamp(),
+            toOffsetDateTime(deposit.getTimestamp()),
             account.getEmail()
         );
     }
@@ -104,7 +107,7 @@ public class TransactionService {
             withdrawal.getId(),
             withdrawal.getAmountInCents(),
             account.getBalanceInCents(),
-            withdrawal.getTimestamp(),
+            toOffsetDateTime(withdrawal.getTimestamp()),
             account.getEmail()
         );
     }
@@ -149,7 +152,7 @@ public class TransactionService {
             transfer.getId(),
             transfer.getAmountInCents(),
             sender.getBalanceInCents(),
-            transfer.getTimestamp(),
+            toOffsetDateTime(transfer.getTimestamp()),
             sender.getEmail(),
             recipient.getEmail()
         );
@@ -222,7 +225,7 @@ public class TransactionService {
         return new RetrieveDepositResponse(
             deposit.getId(),
             deposit.getAmountInCents(),
-            deposit.getTimestamp(),
+            toOffsetDateTime(deposit.getTimestamp()),
             deposit.getAccount().getEmail()
         );
     }
@@ -232,7 +235,7 @@ public class TransactionService {
         return new RetrieveWithdrawalResponse(
             withdrawal.getId(),
             withdrawal.getAmountInCents(),
-            withdrawal.getTimestamp(),
+            toOffsetDateTime(withdrawal.getTimestamp()),
             withdrawal.getAccount().getEmail()
         );
     }
@@ -242,10 +245,14 @@ public class TransactionService {
         return new RetrieveTransferResponse(
             transfer.getId(),
             transfer.getAmountInCents(),
-            transfer.getTimestamp(),
+            toOffsetDateTime(transfer.getTimestamp()),
             transfer.getSenderAccount().getEmail(),
             transfer.getRecipientAccount().getEmail(),
             loggedInAccount.getEmail()
         );
+    }
+
+    private OffsetDateTime toOffsetDateTime(Instant timestamp) {
+        return timestamp.atOffset(ZoneOffset.UTC);
     }
 }

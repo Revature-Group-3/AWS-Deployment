@@ -80,8 +80,7 @@ export class Deposit {
 
     this.transactions.deposit({ amountInCents }).subscribe({
       next: transaction => {
-        this.auth.updateBalance(user.username, this.currentBalance() + amountInCents);
-        this.isLoading.set(false);
+        this.auth.updateCurrentBalance(transaction.newBalanceInCents);        this.isLoading.set(false);
         this.toast.show('Deposit Successful.');
         this.dialogRef.close(transaction);
         this.router.navigate(['/dashboard']);

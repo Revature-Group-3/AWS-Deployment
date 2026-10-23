@@ -13,7 +13,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }
 
     // Only attach the token to requests going to our backend.
-    if (!req.url.startsWith('http://localhost:8080/api/')) {
+    if (!req.url.startsWith('/api')) {
         return next(req);
     }
 

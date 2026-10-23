@@ -115,6 +115,8 @@ export class Transfer {
       )
       .subscribe({
         next: result => {
+          this.auth.updateCurrentBalance(result.newBalanceInCents);
+      
           // Toast Notification
           this.toast.show('Transfer Successful.');
 

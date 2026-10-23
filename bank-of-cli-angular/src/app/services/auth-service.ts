@@ -1,6 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
-
+import { catchError, map, Observable, switchMap, tap, throwError } from 'rxjs';
 import { Account } from '../models/account';
 import {
   ApiService,
@@ -144,23 +143,37 @@ export class AuthService {
 
     // Check if account already exists:
     return this.api.login({ email, password }).pipe(
-      tap(response => {
+      switchMap(response => {
         this.token.set(response.token);
 
         // The JWT payload (middle section) holds the account id as "sub" and the email.
-        const claims = JSON.parse(atob(response.token.split('.')[1]));
+        const claims = JSON.parse(atob(response.token.split('.')[1])) as { sub: string};
 
         // Name and balance aren't in the token; fill them in once the backend has an /accounts/me endpoint.
-        this.currentUser.set({
-          id: Number(claims.sub),
-          username: claims.email,
-          firstName: '',
-          lastName: '',
-          balance: 0
-        });
+        return this.api.getAccount().pipe(
+          tap(account => {
+            this.currentUser.set({id: Number(claims.sub),
+              username: account.email,
+              firstName: account.firstName,
+              lastName: account.lastName,
+              balance: account.balanceInCents
+            });
+          }),
+          map(() => response)
+        );
+      }),
+      catchError(error => {
+        this.token.set(null);
+        this.currentUser.set(null);
+        return throwError(() => error);
       })
     );
   }
+
+public updateCurrentBalance(balanceInCents: number): void {
+  this.currentUser.update(user => user ? { ...user, balance: balanceInCents } : null
+  );
+}
 
   public getToken(): string | null {
     return this.token();

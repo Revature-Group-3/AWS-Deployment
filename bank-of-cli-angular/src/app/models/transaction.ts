@@ -4,6 +4,7 @@ export interface StandardTransaction {
   accountEmail: string;
   type: 'DEPOSIT' | 'WITHDRAWAL';
   amountInCents: number;
+  newBalanceInCents: number;
   timestamp: string;
 }
 

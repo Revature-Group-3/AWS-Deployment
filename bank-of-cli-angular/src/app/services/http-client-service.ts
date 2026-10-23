@@ -28,6 +28,13 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface AccountDetails {
+  email: string;
+  firstName: string;
+  lastName: string;
+  balanceInCents: number;
+}
+
 export interface ApiTransferRequest {
   recipientAccountEmail: string;
   amountInCents: number;
@@ -39,6 +46,7 @@ export interface ApiTransferResponse {
   recipientAccountEmail: string;
   type: 'TRANSFER';
   amountInCents: number;
+  newBalanceInCents: number;
   timestamp: string;
 }
 
@@ -46,9 +54,13 @@ export interface ApiTransferResponse {
   providedIn: 'root'
 })
 export class ApiService {
-  apiUrl = 'http://localhost:8080/api';
+  apiUrl = '/api';
 
   constructor(private http: HttpClient) { }
+
+  getAccount(): Observable<AccountDetails> {
+    return this.http.get<AccountDetails>(`${this.apiUrl}/accounts/me`);
+  }
 
   login(request: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(
@@ -66,29 +78,27 @@ export class ApiService {
 
   getTransactions(): Observable<RecentTransactionsResponse> {
     return this.http.get<RecentTransactionsResponse>(
-      `${this.apiUrl}/accounts/transactions`
+      `${this.apiUrl}/account/transactions`
     );
   }
 
   deposit(request: DepositRequest): Observable<StandardTransaction> {
     return this.http.post<StandardTransaction>(
-      `${this.apiUrl}/accounts/deposit`,
+      `${this.apiUrl}/account/deposit`,
       request
     );
   }
 
   withdraw(request: WithdrawalRequest): Observable<StandardTransaction> {
     return this.http.post<StandardTransaction>(
-      `${this.apiUrl}/accounts/withdraw`,
+      `${this.apiUrl}/account/withdraw`,
       request
     );
   }
 
-  transfer(
-    request: ApiTransferRequest
-  ): Observable<ApiTransferResponse> {
+  transfer(request: ApiTransferRequest): Observable<ApiTransferResponse> {
     return this.http.post<ApiTransferResponse>(
-      `${this.apiUrl}/transfer`,
+      `${this.apiUrl}/account/transfer`,
       request
     );
   }

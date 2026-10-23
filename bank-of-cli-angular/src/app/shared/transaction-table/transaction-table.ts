@@ -10,7 +10,7 @@ import { CentsIntegerToDollarStringPipe } from '../pipes/cents-integer-to-dollar
 interface TransactionRow {
   type: string;
   date: string;
-  status: string;
+  account: string;
   amount: number;
 }
 
@@ -26,7 +26,7 @@ export class TransactionTable {
   private transactionService = inject(TransactionService);
   private destroyRef = inject(DestroyRef);
 
-  readonly displayedColumns = ['Type', 'Date', 'Amount'];
+  readonly displayedColumns = ['Type', 'Date', 'Account', 'Amount'];
   readonly errorMessage = signal<string | null>(null);
   readonly dataSource = signal<TransactionRow[]>([]);
   readonly isLoading = signal(true);
@@ -56,12 +56,23 @@ export class TransactionTable {
       .subscribe({
         next: response => {
           this.dataSource.set(
-            response.transactions.map(transaction => ({
-              type: transaction.type,
-              date: transaction.timestamp,
-              status: 'Loaded in recent transactions.',
-              amount: transaction.amountInCents,
-            })));
+            response.transactions.map(transaction => {
+              const account = transaction.type === 'TRANSFER'
+                ? transaction.direction === 'OUTGOING'
+                  ? transaction.recipientAccountEmail
+                  : transaction.direction === 'INCOMING'
+                    ? transaction.senderAccountEmail
+                    : 'Unknown account'
+                : transaction.accountEmail;
+
+              return {
+                type: transaction.type,
+                account,
+                date: transaction.timestamp,
+                amount: transaction.amountInCents,
+              };
+            })
+          );
           this.isLoading.set(false);
         },
         error: err => {

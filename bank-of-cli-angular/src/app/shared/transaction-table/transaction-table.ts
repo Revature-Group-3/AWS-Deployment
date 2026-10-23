@@ -40,6 +40,17 @@ export class TransactionTable {
       return;
     }
 
+    this.loadTransactions();
+
+    this.transactionService.transactionChanges$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.loadTransactions());
+  }
+
+  private loadTransactions(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
     this.transactionService.getRecentTransactions()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

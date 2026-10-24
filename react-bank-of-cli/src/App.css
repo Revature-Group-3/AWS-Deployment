@@ -1,0 +1,28 @@
+body {
+  background-color: rgb(247, 244, 244);
+}
+
+.container {
+  display: flex;
+  width: 100%;
+  padding: 2rem;
+  flex-direction: column;
+  gap: 2rem;
+  height: 90dvh;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.hidden {
+  visibility: hidden;
+}
+
+@media(max-width: 600px){
+  .no-mobile {
+    display: none;
+  }
+}
+
+.redbg {
+  background-color: oklch(34.795% 0.12058 19.316);
+}

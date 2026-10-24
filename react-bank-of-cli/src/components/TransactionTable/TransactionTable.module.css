@@ -1,0 +1,16 @@
+
+
+@media (max-width: 768px){
+
+    .notMobile {
+        display: none;
+    }
+}
+
+@media (min-width: 769px){
+    .mobile {
+        display: none;
+    }
+
+}
+

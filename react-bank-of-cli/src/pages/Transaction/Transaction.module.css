@@ -1,0 +1,22 @@
+.container {
+  display: flex;
+  width: 100%;
+  padding: 2rem;
+  flex-direction: column;
+  gap: 2rem;
+  height: 90dvh;
+  overflow: hidden;
+  scrollbar-width: none;
+  align-items: center;
+  height: 90dvh;
+  overflow: hidden;
+  scrollbar-width: none;
+  justify-content: center;
+}
+
+.serif {
+  font-family: Times, serif;
+  font-size: 1.5rem;
+  font-weight: 100;
+  align-self: flex-start;
+}

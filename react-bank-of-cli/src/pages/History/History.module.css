@@ -1,0 +1,15 @@
+.container {
+  display: flex;
+  width: 100%;
+  padding: 2rem;
+  flex-direction: column;
+  gap: 2rem;
+  height: 90dvh;
+  overflow: hidden;
+  scrollbar-width: none;
+  align-items: center;
+  height: 90dvh;
+  overflow: hidden;
+  scrollbar-width: none;
+  justify-content: center;
+}

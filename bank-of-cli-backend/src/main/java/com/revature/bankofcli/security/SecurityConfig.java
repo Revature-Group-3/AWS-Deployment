@@ -77,7 +77,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173", "https://ddyoy3tbtm3aq.cloudfront.net")); // allows frontend access
+        config.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5173", "https://ddyoy3tbtm3aq.cloudfront.net", "https://d3ni4zugx68uee.cloudfront.net")); // allows frontend access
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
